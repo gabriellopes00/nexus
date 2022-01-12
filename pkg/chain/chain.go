@@ -1,25 +1,79 @@
 package chain
 
 import (
+	"fmt"
 	"nexus/pkg/block"
+	"nexus/pkg/db"
+	"runtime"
 )
 
 type Chain struct {
-	Blocks     []*block.Block
-	difficulty int
+	Blocks []*block.Block
+	db     db.BadgerDB
 }
 
-func NewChain(difficulty int) *Chain {
+func NewChain(db *db.BadgerDB) *Chain {
 	chain := &Chain{
-		difficulty: difficulty,
+		db:     *db,
+		Blocks: []*block.Block{},
 	}
+
 	chain.createGenesisBlock()
+
 	return chain
 }
 
 func (c *Chain) createGenesisBlock() {
-	block := block.NewBlock(0, []byte{}, []byte{})
-	c.Blocks = append(c.Blocks, block)
+
+	value, err := c.db.Find([]byte("lh"))
+	if err != nil {
+		fmt.Println(err)
+		fmt.Println("err")
+		runtime.Goexit()
+	}
+
+	if value == nil {
+
+		fmt.Println("creating genesis block")
+
+		genesis := block.NewBlock(0, []byte{}, []byte{})
+
+		serialized, err := genesis.Serialize()
+		if err != nil {
+			fmt.Println(err) // TODO: implement error handling
+			runtime.Goexit()
+		}
+
+		err = c.db.Save(genesis.Hash, serialized)
+		if err != nil {
+			fmt.Println(err)
+			runtime.Goexit()
+		}
+
+		err = c.db.Save([]byte("lh"), genesis.Hash)
+		if err != nil {
+			fmt.Println(err)
+			runtime.Goexit()
+		}
+		c.Blocks = append(c.Blocks, genesis)
+
+	} else {
+		genesisByte, err := c.db.Find(value)
+		if err != nil {
+			fmt.Println(err)
+			runtime.Goexit()
+		}
+
+		fmt.Println("genesis block found")
+
+		genesis, err := block.Deserialize(genesisByte)
+		if err != nil {
+			fmt.Println(err)
+			runtime.Goexit()
+		}
+		c.Blocks = append(c.Blocks, genesis)
+	}
+
 }
 
 func (c *Chain) GetLatestBlock() *block.Block {
@@ -27,21 +81,35 @@ func (c *Chain) GetLatestBlock() *block.Block {
 }
 
 func (c *Chain) AddBlock(data []byte) error {
-	// var buf bytes.Buffer
-	// encoder := gob.NewEncoder(&buf)
-	// err := encoder.Encode(data)
-	// if err != nil {
-	// 	return err
-	// }
+
+	var latestHash []byte
+	latestHash, err := c.db.Find([]byte("lh"))
+	if err != nil {
+		return err
+	}
 
 	newBlock := block.NewBlock(
 		// c.GetLatestBlock().Index+1,
 		1,
-		c.GetLatestBlock().Hash,
+		latestHash,
 		data,
 	)
 
-	// newBlock.Mine(c.difficulty)
+	serialized, err := newBlock.Serialize()
+	if err != nil {
+		return err
+	}
+
+	err = c.db.Save(newBlock.Hash, serialized)
+	if err != nil {
+		return err
+	}
+
+	err = c.db.Save([]byte("lh"), newBlock.Hash)
+	if err != nil {
+		return err
+	}
+
 	c.Blocks = append(c.Blocks, newBlock)
 
 	return nil

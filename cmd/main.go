@@ -2,36 +2,27 @@ package main
 
 import (
 	"fmt"
-	"nexus/env"
 	"nexus/pkg/chain"
-	"time"
+	"nexus/pkg/cli"
+	"nexus/pkg/db"
+	"os"
+	"runtime"
 )
 
 func main() {
-	blockchain := chain.NewChain(env.BLOCKCHAIN_MINING_DIFFICULTY)
-	start := time.Now()
-	// fmt.Println(start)
+	defer os.Exit(0)
 
-	blockchain.AddBlock([]byte("lorem"))
-	blockchain.AddBlock([]byte("ipsum"))
-	blockchain.AddBlock([]byte("dolor"))
-	blockchain.AddBlock([]byte("sit"))
-	blockchain.AddBlock([]byte("amet"))
+	blockchainDB, err := db.NewBadgerDB()
+	if err != nil {
+		fmt.Println(err)
+		runtime.Goexit()
+	}
 
-	fmt.Println("finished blocks creation")
-	fmt.Println(time.Since(start))
+	defer blockchainDB.Conn.Close()
 
-	// for _, b := range blockchain.Blocks {
+	blockchain := chain.NewChain(blockchainDB)
 
-	// 	fmt.Printf("prev hash: %x\n", b.PrevHash)
-	// 	fmt.Printf("data: %s\n", b.Data)
-	// 	fmt.Printf("hash: %x\n", b.Hash)
-
-	// 	pow := block.NewProofOfWork(b)
-	// 	fmt.Printf("pow: %s\n", strconv.FormatBool(pow.Validate()))
-	// 	fmt.Println("")
-
-	// }
-	// println(blockchain.IsValidChain())
+	commandLine := cli.NewCli(blockchain)
+	commandLine.Run()
 
 }
