@@ -1,5 +1,9 @@
 package block
 
+import (
+	merkletree "nexus/pkg/merkle_tree"
+)
+
 type Block struct {
 	// Index     int
 	// Timestamp time.Time
@@ -25,4 +29,12 @@ func NewBlock(index int, prevHash []byte, data []byte) *Block {
 	block.Nonce = nonce
 
 	return block
+}
+
+func (b *Block) HashData() []byte {
+	tree := merkletree.NewMerkleTree(
+		[][]byte{b.Data},
+	)
+
+	return tree.RootNode.Data
 }

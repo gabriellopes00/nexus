@@ -1,11 +1,11 @@
-package markletree
+package merkletree
 
-type MarkleTree struct {
-	RootNode *MarkleNode
+type MerkleTree struct {
+	RootNode *MerkleNode
 }
 
-func NewMarkleTree(data [][]byte) *MarkleTree {
-	var nodes []MarkleNode
+func NewMerkleTree(data [][]byte) *MerkleTree {
+	var nodes []MerkleNode
 
 	if len(data)%2 != 0 {
 		// If the amount of data is odd, then is needed to duplicate the last data, to complete the tree
@@ -14,21 +14,21 @@ func NewMarkleTree(data [][]byte) *MarkleTree {
 
 	// starts adding adding the values to the nodes and pushing it to the array
 	for _, value := range data {
-		node := NewMarkleNode(nil, nil, value)
+		node := NewMerkleNode(nil, nil, value)
 		nodes = append(nodes, *node)
 	}
 
 	for i := 0; i < len(data)/2; i++ {
-		var levels []MarkleNode // sub-levels of nodes
+		var levels []MerkleNode // sub-levels of nodes
 
 		for j := 0; j < len(nodes); j += 2 {
-			node := NewMarkleNode(&nodes[j], &nodes[j+1], nil)
+			node := NewMerkleNode(&nodes[j], &nodes[j+1], nil)
 			levels = append(levels, *node)
 		}
 
 		nodes = levels
 	}
 
-	// creates the markle-tree
-	return &MarkleTree{&nodes[0]}
+	// creates the merkle-tree
+	return &MerkleTree{&nodes[0]}
 }

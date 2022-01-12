@@ -1,15 +1,15 @@
-package markletree
+package merkletree
 
 import "crypto/sha512"
 
-type MarkleNode struct {
-	Left  *MarkleNode
-	Right *MarkleNode
+type MerkleNode struct {
+	Left  *MerkleNode
+	Right *MerkleNode
 	Data  []byte
 }
 
-func NewMarkleNode(left, right *MarkleNode, data []byte) *MarkleNode {
-	node := MarkleNode{}
+func NewMerkleNode(left, right *MerkleNode, data []byte) *MerkleNode {
+	node := MerkleNode{}
 
 	if left == nil && right == nil {
 		hash := sha512.Sum512(data)
