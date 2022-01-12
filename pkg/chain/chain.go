@@ -1,13 +1,11 @@
 package chain
 
 import (
-	"bytes"
-	"encoding/gob"
 	"nexus/pkg/block"
 )
 
 type Chain struct {
-	blocks     []*block.Block
+	Blocks     []*block.Block
 	difficulty int
 }
 
@@ -15,56 +13,57 @@ func NewChain(difficulty int) *Chain {
 	chain := &Chain{
 		difficulty: difficulty,
 	}
-	chain.genGenesisBlock()
+	chain.createGenesisBlock()
 	return chain
 }
 
-func (c *Chain) genGenesisBlock() {
-	block := block.NewBlock(0, []byte("0"), []byte("0"))
-	c.blocks = append(c.blocks, block)
+func (c *Chain) createGenesisBlock() {
+	block := block.NewBlock(0, []byte{}, []byte{})
+	c.Blocks = append(c.Blocks, block)
 }
 
 func (c *Chain) GetLatestBlock() *block.Block {
-	return c.blocks[len(c.blocks)-1]
+	return c.Blocks[len(c.Blocks)-1]
 }
 
-func (c *Chain) AddBlock(data interface{}) error {
-	var buf bytes.Buffer
-	encoder := gob.NewEncoder(&buf)
-	err := encoder.Encode(data)
-	if err != nil {
-		return err
-	}
+func (c *Chain) AddBlock(data []byte) error {
+	// var buf bytes.Buffer
+	// encoder := gob.NewEncoder(&buf)
+	// err := encoder.Encode(data)
+	// if err != nil {
+	// 	return err
+	// }
 
 	newBlock := block.NewBlock(
-		c.GetLatestBlock().Index+1,
+		// c.GetLatestBlock().Index+1,
+		1,
 		c.GetLatestBlock().Hash,
-		buf.Bytes(),
+		data,
 	)
 
-	newBlock.Mine(c.difficulty)
-	c.blocks = append(c.blocks, newBlock)
+	// newBlock.Mine(c.difficulty)
+	c.Blocks = append(c.Blocks, newBlock)
 
 	return nil
 }
 
-func (c *Chain) IsValid() bool {
-	for i := range c.blocks[1:] {
-		prevBlock := c.blocks[i]
-		currentBlock := c.blocks[i+1]
+// func (c *Chain) IsValidChain() bool {
+// 	for i := range c.Blocks[1:] {
+// 		prevBlock := c.Blocks[i]
+// 		currentBlock := c.Blocks[i+1]
 
-		if !bytes.Equal(currentBlock.Hash, currentBlock.GenHash()) {
-			return false
-		}
+// 		if !bytes.Equal(currentBlock.Hash, currentBlock.DriveHash()) {
+// 			return false
+// 		}
 
-		if !bytes.Equal(currentBlock.PrevHash, prevBlock.Hash) {
-			return false
-		}
+// 		if !bytes.Equal(currentBlock.PrevHash, prevBlock.Hash) {
+// 			return false
+// 		}
 
-		if prevBlock.Index+1 != currentBlock.Index {
-			return false
-		}
-	}
+// 		// if prevBlock.Index+1 != currentBlock.Index {
+// 		// 	return false
+// 		// }
+// 	}
 
-	return true
-}
+// 	return true
+// }

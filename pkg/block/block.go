@@ -1,78 +1,60 @@
 package block
 
-import (
-	"bytes"
-	"crypto/sha512"
-	"math/rand"
-	"strconv"
-	"strings"
-	"time"
-)
-
 type Block struct {
-	Index     int
-	Timestamp time.Time
-	PrevHash  []byte
-	Hash      []byte
-	Data      []byte
-	Nonce     int
+	// Index     int
+	// Timestamp time.Time
+	PrevHash []byte
+	Hash     []byte
+	Data     []byte
+	Nonce    int
 }
 
 func NewBlock(index int, prevHash []byte, data []byte) *Block {
 	block := &Block{
-		Index:     index,
-		Data:      data,
-		PrevHash:  prevHash,
-		Timestamp: time.Now(),
-		Nonce:     rand.Int(),
+		// Index:     index,
+		Data:     data,
+		PrevHash: []byte{},
+		// Timestamp: time.Now(),
+		Nonce: 0,
 	}
 
-	block.Hash = block.GenHash()
+	pow := NewProofOfWork(block)
+	nonce, hash := pow.Run()
+
+	block.Hash = hash
+	block.Nonce = nonce
+
 	return block
 }
 
-func (b *Block) GenHash() []byte {
-	payload := bytes.Join(
-		[][]byte{
-			b.Data,
-			b.PrevHash,
-			[]byte(strconv.Itoa(b.Nonce)),
-			[]byte(b.Timestamp.String()),
-		},
-		[]byte{},
-	)
-	hash := sha512.Sum512([]byte(payload))
-	return hash[:]
-}
+// func (b *Block) Mine(difficulty int) {
 
-func (b *Block) Mine(difficulty int) {
+// 	hashChan := make(chan []byte)
 
-	hashChan := make(chan []byte)
+// 	driveHash := func(channel chan<- []byte) {
+// 		b.Nonce++
+// 		HASH := b.DriveHash()
+// 		channel <- HASH
+// 	}
 
-	driveHash := func(channel chan<- []byte) {
-		b.Nonce++
-		HASH := b.GenHash()
-		channel <- HASH
-	}
+// 	go func() {
+// 		for !strings.HasPrefix(string(b.Hash), strings.Repeat("0", difficulty)) {
+// 			driveHash(hashChan)
+// 		}
+// 		close(hashChan)
+// 	}()
 
-	go func() {
-		for !strings.HasPrefix(string(b.Hash), strings.Repeat("0", difficulty)) {
-			driveHash(hashChan)
-		}
-		close(hashChan)
-	}()
+// 	for hash := range hashChan {
+// 		b.Hash = hash
+// 	}
+// }
 
-	for hash := range hashChan {
-		b.Hash = hash
-	}
-}
-
-type BlockParse struct {
-	Data      interface{}
-	Timestamp string
-	Hash      string
-	PrevHash  string
-}
+// type BlockParse struct {
+// 	Data      interface{}
+// 	Timestamp string
+// 	Hash      string
+// 	PrevHash  string
+// }
 
 // func (b *Block) Parse() (*BlockParse, error) {
 // 	// var buf bytes.Buffer
