@@ -29,7 +29,9 @@ func NewProofOfWork(block *Block) *ProofOfWork {
 	target := big.NewInt(1)
 
 	if difficulty > hashBytes {
-		panic(errors.New("difficulty must be less then the hash bytes quantity"))
+		utils.HandleException(
+			errors.New("difficulty must be less then the hash bytes quantity"),
+		)
 	}
 
 	target.Lsh(target, uint(hashBytes-difficulty))
