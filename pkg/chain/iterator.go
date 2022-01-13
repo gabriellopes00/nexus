@@ -1,7 +1,6 @@
 package chain
 
 import (
-	"fmt"
 	"nexus/pkg/block"
 	"nexus/pkg/db"
 )
@@ -32,7 +31,6 @@ func (i *ChainIterator) Next() (*block.Block, error) {
 
 	b, err = block.Deserialize(data)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 

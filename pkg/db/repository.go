@@ -7,12 +7,12 @@ import (
 )
 
 type BlockchainDB interface {
-	Save(key, value []byte) error
+	Save(key, value []byte) (err error)
 	Find(key []byte) (value []byte, err error)
 }
 
-func (db *BadgerDB) Save(key, value []byte) error {
-	err := db.Conn.Update(func(txn *badger.Txn) error {
+func (db *BadgerDB) Save(key, value []byte) (err error) {
+	err = db.Conn.Update(func(txn *badger.Txn) error {
 
 		err := txn.Set(key, value)
 		return err

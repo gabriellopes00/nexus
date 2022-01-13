@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"nexus/pkg/block"
 	"nexus/pkg/db"
+	"nexus/utils"
 	"runtime"
 )
 
@@ -26,11 +27,7 @@ func NewChain(db *db.BadgerDB) *Chain {
 func (c *Chain) createGenesisBlock() {
 
 	value, err := c.db.Find([]byte("lh"))
-	if err != nil {
-		fmt.Println(err)
-		fmt.Println("err")
-		runtime.Goexit()
-	}
+	utils.HandleException(err)
 
 	if value == nil {
 
@@ -39,30 +36,18 @@ func (c *Chain) createGenesisBlock() {
 		genesis := block.NewBlock(0, []byte{}, []byte{})
 
 		serialized, err := genesis.Serialize()
-		if err != nil {
-			fmt.Println(err) // TODO: implement error handling
-			runtime.Goexit()
-		}
+		utils.HandleException(err)
 
 		err = c.db.Save(genesis.Hash, serialized)
-		if err != nil {
-			fmt.Println(err)
-			runtime.Goexit()
-		}
+		utils.HandleException(err)
 
 		err = c.db.Save([]byte("lh"), genesis.Hash)
-		if err != nil {
-			fmt.Println(err)
-			runtime.Goexit()
-		}
+		utils.HandleException(err)
 		c.Blocks = append(c.Blocks, genesis)
 
 	} else {
 		genesisByte, err := c.db.Find(value)
-		if err != nil {
-			fmt.Println(err)
-			runtime.Goexit()
-		}
+		utils.HandleException(err)
 
 		fmt.Println("genesis block found")
 
@@ -89,8 +74,7 @@ func (c *Chain) AddBlock(data []byte) error {
 	}
 
 	newBlock := block.NewBlock(
-		// c.GetLatestBlock().Index+1,
-		1,
+		c.GetLatestBlock().Index+1,
 		latestHash,
 		data,
 	)
@@ -115,12 +99,12 @@ func (c *Chain) AddBlock(data []byte) error {
 	return nil
 }
 
-// func (c *Chain) IsValidChain() bool {
+// func (c *Chain) Validate() bool {
 // 	for i := range c.Blocks[1:] {
 // 		prevBlock := c.Blocks[i]
 // 		currentBlock := c.Blocks[i+1]
 
-// 		if !bytes.Equal(currentBlock.Hash, currentBlock.DriveHash()) {
+// 		if !bytes.Equal(currentBlock.Hash, block.NewProofOfWork(&currentBlock).Validate()) {
 // 			return false
 // 		}
 
@@ -128,9 +112,9 @@ func (c *Chain) AddBlock(data []byte) error {
 // 			return false
 // 		}
 
-// 		// if prevBlock.Index+1 != currentBlock.Index {
-// 		// 	return false
-// 		// }
+// 		if prevBlock.Index+1 != currentBlock.Index {
+// 			return false
+// 		}
 // 	}
 
 // 	return true

@@ -16,3 +16,15 @@ func Encode(data interface{}) []byte {
 
 	return buff.Bytes()
 }
+
+func Decode(data []byte) interface{} {
+	var decoded interface{}
+
+	decoder := gob.NewDecoder(bytes.NewReader(data))
+	err := decoder.Decode(&decoded)
+	if err != nil {
+		HandleException(err)
+	}
+
+	return decoded
+}

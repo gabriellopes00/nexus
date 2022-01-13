@@ -47,7 +47,8 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 		[][]byte{
 			pow.Block.PrevHash,
 			pow.Block.Data,
-			// utils.IntToByte(pow.Block.Timestamp.Unix()),
+			utils.IntToByte(pow.Block.Timestamp.Unix()),
+			utils.IntToByte(int64(pow.Block.Index)),
 			utils.IntToByte(int64(difficulty)),
 			utils.IntToByte(int64(nonce)),
 		},
