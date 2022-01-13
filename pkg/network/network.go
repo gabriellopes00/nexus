@@ -2,9 +2,12 @@ package network
 
 import (
 	"bytes"
+	"encoding/gob"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"nexus/pkg/block"
 	"nexus/pkg/chain"
@@ -56,9 +59,9 @@ type Inventory struct {
 	Items   [][]byte
 }
 
-type Data struct {
-	Addfrom     string
-	Transaction []byte
+type BlockData struct {
+	Addfrom string
+	Data    []byte
 }
 
 type Version struct {
@@ -74,21 +77,6 @@ func CloseDB(blockchain *chain.Chain) {
 		defer runtime.Goexit()
 		// TODO: close db conn
 	})
-}
-
-func HandleConnection(conn net.Conn, blockchain *chain.Chain) {
-	req, err := ioutil.ReadAll(conn)
-	defer conn.Close()
-
-	utils.HandleException(err)
-
-	command := BytesToCmd(req[:commandLength])
-
-	switch command {
-	default:
-		fmt.Println("unknown command")
-
-	}
 }
 
 func SendData(addr string, data []byte) {
@@ -139,4 +127,332 @@ func SendBlock(addr string, b *block.Block) {
 	payload := utils.Encode(data)
 	req := append(CmdToBytes("block"), payload...)
 	SendData(addr, req)
+}
+
+func SendInventory(addr, kind string, items [][]byte) {
+	inventory := Inventory{
+		AddFrom: nodeAddr,
+		Type:    kind,
+		Items:   items,
+	}
+	payload := utils.Encode(inventory)
+	req := append(CmdToBytes("inventory"), payload...)
+	SendData(addr, req)
+}
+
+func SendBlockData(addr string, data []byte) {
+	blockData := BlockData{
+		Addfrom: nodeAddr,
+		Data:    data,
+	}
+
+	payload := utils.Encode(blockData)
+	req := append(CmdToBytes("block_data"), payload...)
+	SendData(addr, req)
+}
+
+func SendVersion(addr string, chain *chain.Chain) {
+	height := chain.GetBestHeight()
+
+	vs := Version{
+		Version:    version,
+		BestHeight: height,
+		AddrFrom:   nodeAddr,
+	}
+
+	payload := utils.Encode(vs)
+	req := append(CmdToBytes("version"), payload...)
+	SendData(addr, req)
+}
+
+func SendGetData(addr, kind string, id []byte) {
+	payload := utils.Encode(GetData{nodeAddr, kind, id})
+	req := append(CmdToBytes("get_data"), payload...)
+	SendData(addr, req)
+}
+
+func SendGetBlocks(addr string) {
+	payload := utils.Encode(GetBlocks{AddrFrom: nodeAddr})
+	req := append(CmdToBytes("get_blocks"), payload...)
+	SendData(addr, req)
+}
+
+func HandleAddr(req []byte) {
+	var buff bytes.Buffer
+	var payload Addr
+
+	buff.Write(req[commandLength:])
+	dec := gob.NewDecoder(&buff)
+	err := dec.Decode(&payload)
+	utils.HandleException(err)
+
+	KnownNodes = append(KnownNodes, payload.AddrList...)
+	fmt.Printf("there are %d known nodes\n", len(KnownNodes))
+	RequestBlocks()
+}
+
+func RequestBlocks() {
+	for _, node := range KnownNodes {
+		SendGetBlocks(node)
+	}
+}
+
+func HandleBlock(req []byte, c *chain.Chain) {
+	var buff bytes.Buffer
+	var payload Block
+
+	buff.Write(req[commandLength:])
+	dec := gob.NewDecoder(&buff)
+	err := dec.Decode(&payload)
+	utils.HandleException(err)
+
+	blockData := payload.Block
+	b, err := block.Deserialize(blockData)
+	utils.HandleException(err)
+
+	fmt.Println("received a new block")
+	c.AddBlock(b)
+
+	fmt.Printf("added block %x\n", b.Hash)
+
+	if len(blockInTransit) > 0 {
+		blockHash := blockInTransit[0]
+		SendGetData(payload.AddrFrom, "block", blockHash)
+		blockInTransit = blockInTransit[1:]
+	} else {
+		// utxoSet := c.utsxset(c)
+		// utxoSet.ReIndex()
+	}
+}
+
+func HandleGetBlocks(request []byte, c *chain.Chain) {
+	var buff bytes.Buffer
+	var payload GetBlocks
+
+	buff.Write(request[commandLength:])
+	dec := gob.NewDecoder(&buff)
+	err := dec.Decode(&payload)
+	utils.HandleException(err)
+
+	blocks := chain.GetBlockHashes()
+	SendInventory(payload.AddrFrom, "block", blocks)
+}
+
+func HandleGetData(request []byte, c *chain.Chain) {
+	var buff bytes.Buffer
+	var payload GetData
+
+	buff.Write(request[commandLength:])
+	dec := gob.NewDecoder(&buff)
+	err := dec.Decode(&payload)
+	utils.HandleException(err)
+
+	if payload.Type == "block" {
+		block, err := c.GetBlock([]byte(payload.Id))
+		if err != nil {
+			return
+		}
+
+		SendBlock(payload.AddrFrom, &block)
+	}
+
+	if payload.Type == "block_data" {
+		dataId := hex.EncodeToString(payload.Id)
+		data := memoryPool[dataId]
+
+		SendBlockData(payload.AddrFrom, data)
+	}
+}
+
+func HandleVersion(request []byte, c *chain.Chain) {
+	var buff bytes.Buffer
+	var payload Version
+
+	buff.Write(request[commandLength:])
+	dec := gob.NewDecoder(&buff)
+	err := dec.Decode(&payload)
+	utils.HandleException(err)
+
+	bestHeight := chain.GetBestHeight()
+	otherHeight := payload.BestHeight
+
+	if bestHeight < otherHeight {
+		SendGetBlocks(payload.AddrFrom)
+	} else if bestHeight > otherHeight {
+		SendVersion(payload.AddrFrom, c)
+	}
+
+	if !NodeIsKnown(payload.AddrFrom) {
+		KnownNodes = append(KnownNodes, payload.AddrFrom)
+	}
+}
+
+func NodeIsKnown(addr string) bool {
+	for _, node := range KnownNodes {
+		if node == addr {
+			return true
+		}
+	}
+
+	return false
+}
+
+func HandleBlockData(request []byte, c *chain.Chain) {
+	var buff bytes.Buffer
+	var payload BlockData
+
+	buff.Write(request[commandLength:])
+	dec := gob.NewDecoder(&buff)
+	err := dec.Decode(&payload)
+	utils.HandleException(err)
+
+	txData := payload.Data
+	tx := c.DeserializeData(txData)
+	memoryPool[hex.EncodeToString(tx.ID)] = tx
+
+	fmt.Printf("%s, %d", nodeAddr, len(memoryPool))
+
+	if nodeAddr == KnownNodes[0] {
+		for _, node := range KnownNodes {
+			if node != nodeAddr && node != payload.Addfrom {
+				SendInventory(node, "block_data", [][]byte{tx.ID})
+			}
+		}
+	} else {
+		if len(memoryPool) >= 2 && len(minerAddr) > 0 {
+			MineBlockDAta(c)
+		}
+	}
+}
+
+func MineBlockDAta(c *chain.Chain) {
+	var data []*chain.Transactions
+
+	for id := range memoryPool {
+		fmt.Printf("tx: %s\n", memoryPool[id].Id)
+		tx := memoryPool[id]
+		if chain.VerifyTransaction(&tx) {
+			data = append(data, &tx)
+		}
+	}
+
+	if len(data) == 0 {
+		fmt.Println("All Transactions are invalid")
+		return
+	}
+
+	cbTx := c.CoinbaseTx(mineAddress, "")
+	data = append(data, cbTx)
+
+	newBlock := c.MineBlock(data)
+	UTXOSet := blockchain.UTXOSet{chain}
+	UTXOSet.Reindex()
+
+	fmt.Println("New Block mined")
+
+	for _, tx := range data {
+		txID := hex.EncodeToString(tx.ID)
+		delete(memoryPool, txID)
+	}
+
+	for _, node := range KnownNodes {
+		if node != nodeAddr {
+			SendInventory(node, "block", [][]byte{newBlock.Hash})
+		}
+	}
+
+	if len(memoryPool) > 0 {
+		MineBlockDAta(c)
+	}
+}
+
+func HandleInv(request []byte, c *chain.Chain) {
+	var buff bytes.Buffer
+	var payload Inventory
+
+	buff.Write(request[commandLength:])
+	dec := gob.NewDecoder(&buff)
+	err := dec.Decode(&payload)
+	utils.HandleException(err)
+
+	fmt.Printf("Received inventory with %d %s\n", len(payload.Items), payload.Type)
+
+	if payload.Type == "block" {
+		blockInTransit = payload.Items
+
+		blockHash := payload.Items[0]
+		SendGetData(payload.AddFrom, "block", blockHash)
+
+		newInTransit := [][]byte{}
+		for _, b := range blockInTransit {
+			if bytes.Compare(b, blockHash) != 0 {
+				newInTransit = append(newInTransit, b)
+			}
+		}
+		blockInTransit = newInTransit
+	}
+
+	if payload.Type == "tx" {
+		txID := payload.Items[0]
+
+		if memoryPool[hex.EncodeToString(txID)].ID == nil {
+			SendGetData(payload.AddFrom, "tx", txID)
+		}
+	}
+}
+
+func HandleConnection(conn net.Conn, c *chain.Chain) {
+	req, err := ioutil.ReadAll(conn)
+	defer conn.Close()
+
+	if err != nil {
+		log.Panic(err)
+	}
+	command := BytesToCmd(req[:commandLength])
+	fmt.Printf("Received %s command\n", command)
+
+	switch command {
+	case "addr":
+		HandleAddr(req)
+	case "block":
+		HandleBlock(req, c)
+	case "inventory":
+		HandleInv(req, c)
+	case "get_blocks":
+		HandleGetBlocks(req, c)
+	case "get_data":
+		HandleGetData(req, c)
+	case "block_Data":
+		HandleBlockData(req, c)
+	case "version":
+		HandleVersion(req, c)
+	default:
+		fmt.Println("Unknown command")
+	}
+
+}
+
+func StartServer(nodeID, minerAddr string) {
+	nodeAddr = fmt.Sprintf("localhost:%s", nodeID)
+	minerAddr = minerAddr
+	ln, err := net.Listen(protocol, nodeAddr)
+	utils.HandleException(err)
+
+	defer ln.Close()
+
+	chain := chain.ContinueBlockChain(nodeID)
+	defer chain.Database.Close()
+	go CloseDB(chain)
+
+	if nodeAddr != KnownNodes[0] {
+		SendVersion(KnownNodes[0], chain)
+	}
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			log.Panic(err)
+		}
+		go HandleConnection(conn, chain)
+
+	}
 }

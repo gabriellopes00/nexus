@@ -43,6 +43,7 @@ func (c *Chain) createGenesisBlock() {
 
 		err = c.db.Save([]byte("lh"), genesis.Hash)
 		utils.HandleException(err)
+
 		c.Blocks = append(c.Blocks, genesis)
 
 	} else {

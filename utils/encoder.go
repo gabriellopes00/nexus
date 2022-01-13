@@ -11,6 +11,7 @@ func Encode(data interface{}) []byte {
 	encoder := gob.NewEncoder(&buff)
 	err := encoder.Encode(data)
 	if err != nil {
+		// TODO: return the error instead of handling it
 		HandleException(err)
 	}
 
