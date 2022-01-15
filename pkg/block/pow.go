@@ -16,7 +16,7 @@ const (
 
 const hashBytes = 512
 
-var difficulty = env.BLOCKCHAIN_MINING_DIFFICULTY
+var difficulty = env.BLOCKCHAIN_DIFFICULTY
 
 // ProofOfWork represents a proof-of-work algorithm
 type ProofOfWork struct {
