@@ -95,11 +95,7 @@ func (c *Chain) AddBlock(data []byte) error {
 		return err
 	}
 
-	newBlock := block.NewBlock(
-		c.GetLatestBlock().Index+1,
-		latestHash,
-		data,
-	)
+	newBlock := block.NewBlock(c.GetLatestBlock().Index+1, latestHash, data)
 
 	serialized, err := newBlock.Serialize()
 	if err != nil {

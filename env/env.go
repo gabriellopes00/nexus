@@ -13,6 +13,9 @@ var (
 	// block chain mining difficulty
 	BLOCKCHAIN_DIFFICULTY = 0
 
+	// amount of threads that will work for hash generation
+	WORKER_HASHERS = 0
+
 	// network port
 	NETWORK_PORT = 0
 
@@ -34,6 +37,9 @@ func init() {
 	utils.HandleException(err)
 
 	BLOCKCHAIN_DIFFICULTY, err = strconv.Atoi(os.Getenv("BLOCKCHAIN_DIFFICULTY"))
+	utils.HandleException(err)
+
+	WORKER_HASHERS, err = strconv.Atoi(os.Getenv("WORKER_HASHERS"))
 	utils.HandleException(err)
 
 	NETWORK_PORT, err = strconv.Atoi(os.Getenv("NETWORK_PORT"))

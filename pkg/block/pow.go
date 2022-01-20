@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math"
 	"math/big"
+	"math/rand"
 	"nexus/env"
 	"nexus/utils"
 )
@@ -17,6 +18,8 @@ const (
 const hashBytes = 512
 
 var difficulty = env.BLOCKCHAIN_DIFFICULTY
+
+var workerHashers = env.WORKER_HASHERS
 
 // ProofOfWork represents a proof-of-work algorithm
 type ProofOfWork struct {
@@ -78,6 +81,46 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 	}
 
 	return nonce, hash[:]
+}
+
+func (pow *ProofOfWork) RunWorkers() (int, []byte) {
+
+	type hashData struct {
+		hash  []byte
+		nonce int
+	}
+
+	hashChan := make(chan hashData)
+
+	for i := 0; i < workerHashers; i++ {
+
+		go func(channel chan hashData, index int) {
+			var hashInt big.Int
+			var hash [64]byte
+			var nonce = rand.Int()
+
+			for nonce < maxNonce {
+				data := pow.prepareData(nonce)
+
+				hash = sha512.Sum512(data)
+				hashInt.SetBytes(hash[:])
+
+				if hashInt.Cmp(pow.Target) == -1 {
+					break
+				} else {
+					nonce++
+				}
+			}
+
+			channel <- hashData{hash: hash[:], nonce: nonce}
+			close(hashChan)
+
+		}(hashChan, i)
+
+	}
+
+	data := <-hashChan
+	return data.nonce, data.hash
 }
 
 // Validate validates block's PoW.

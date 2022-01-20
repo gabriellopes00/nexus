@@ -16,3 +16,6 @@
 
 # Database directory
 temp/
+
+# Env files
+*.env
